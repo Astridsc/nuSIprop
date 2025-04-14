@@ -9,6 +9,7 @@ import scipy.integrate as integ
 import warnings
 import ctypes
 import os
+from tqdm import tqdm
 
 lib_C = ctypes.cdll.LoadLibrary(os.path.abspath('funcs.so'))
 
@@ -23,7 +24,7 @@ log10_delta = np.linspace(0.005, 0.05, 100)
 
 with open("alphatilde_phiphi.dat", 'w') as ofile:
     ofile.write("#|tbar_plus|  log10(delta)  \int_{tbar_plus}^{tbar_minus} dtbar \int_{-tbar}^{-tbar_plus} dsbar \int_{tauphibar_min}^tbar dtauphibar/(-tauphibar) dsigma/dtauphibar\n")
-    for t in tbar_plus:
+    for t in tqdm(tbar_plus, desc="Computing alphatilde"):
         for d in log10_delta:
             delta = 10**d
             tplus = t
@@ -42,7 +43,7 @@ log10_delta = np.linspace(0.005, 0.05, 100)
 
 with open("alpha_phiphi.dat", 'w') as ofile:
     ofile.write("#sbar_plus    log10(delta) log(sbar_minus/-tbar_minus)/log(delta)   \int_{tbar_plus}^{tbar_minus} dtbar \int_{sbar_minus}^{sbar_plus} dsbar \int_{tauphibar_min}^tbar dtauphibar/(-tauphibar) dsigma/dtauphibar\n")
-    for s in sbar_plus:
+    for s in tqdm(sbar_plus, desc="Computing alpha"):
         for n in log_sbar_minus_over_tbar_minus_over_log_delta:
             for d in log10_delta:
                 delta = 10**d
