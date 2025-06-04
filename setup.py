@@ -1,12 +1,16 @@
-from distutils.core import setup, Extension
+from setuptools import setup, Extension
 from Cython.Build import cythonize
+import numpy as np
 
-extensions = [Extension("nuSIprop", ["nuSIprop.pyx"],
-                        #include_dirs=[...],
-                        libraries=["gsl", "gslcblas"] ,
-                        # library_dirs=[...],
-                        extra_compile_args=["-O3", "-std=gnu++11"] 
-                        )]
+extensions = [Extension("nuSIprop", 
+                       ["nuSIprop.pyx"],
+                       include_dirs=[np.get_include()],
+                       libraries=["gsl", "gslcblas"],
+                       extra_compile_args=["-O3", "-std=gnu++11"],
+                       language="c++")]
+
 setup(
-    ext_modules = cythonize(extensions),
+    name="nuSIprop",
+    ext_modules=cythonize(extensions),
+    include_dirs=[np.get_include()]
 )

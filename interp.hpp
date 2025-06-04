@@ -5,10 +5,54 @@
 #include <cstring>
 #include <cmath>
 #include <unistd.h>
+#include <fstream>
+#include <vector>
 #define SQR(x)  ((x)*(x))  // square of a number
 #define CUB(x)  ((x)*(x)*(x))  // cube of a number
 
 namespace interp{
+
+  // Helper function to read .npy files
+  template <int N_dim>
+  void read_npy_file(const char* filepath, double* f, int* N_dat) {
+    FILE* fp = fopen(filepath, "rb");
+    if (!fp) {
+      std::cerr << "Error: Could not open file " << filepath << std::endl;
+      exit(1);
+    }
+
+    // Read the .npy header
+    char header[256];
+    fread(header, 1, 256, fp);
+
+    // Extract shape information from header
+    std::vector<int> shape;
+    char* shape_start = strstr(header, "shape");
+    if (shape_start) {
+      shape_start = strchr(shape_start, '(') + 1;
+      char* shape_end = strchr(shape_start, ')');
+      char shape_str[256];
+      strncpy(shape_str, shape_start, shape_end - shape_start);
+      shape_str[shape_end - shape_start] = '\0';
+
+      // Parse shape string
+      char* token = strtok(shape_str, ",");
+      while (token) {
+        shape.push_back(atoi(token));
+        token = strtok(NULL, ",");
+      }
+    }
+
+    // Verify shape matches expected dimensions
+    if (shape.size() != N_dim + 1) {
+      std::cerr << "Error: Shape mismatch in .npy file" << std::endl;
+      exit(1);
+    }
+
+    // Read the data
+    fread(f, sizeof(double), shape[0] * shape[1], fp);
+    fclose(fp);
+  }
 
   template <int N_dim>
   class spline_ND{
@@ -171,7 +215,7 @@ namespace interp{
      *                        Default: false
      */
     spline_ND(const int N_dat_[N_dim], const char *filepath, bool isRegular_ = false,
-	      const bool *isLog_ = nullptr, bool isBinary = false):
+	      const bool *isLog_ = nullptr, bool isBinary = false, bool isNpy = false):
       isRegular(isRegular_){
       
       /* We first copy the array N_dat and initialize other arrays */
@@ -196,43 +240,45 @@ namespace interp{
       f = new double[size_f];
 
       /* We now read the input file */
-      if(!isBinary){
-	/* Text file */
-	if(access(filepath, F_OK) != 0){
-	  std::cerr<<"Error at interp: the input file "<<filepath<<" does not exist"<<std::endl;
-	  exit(1);
-	}
-	
-	FILE *fp = fopen(filepath, "r");
-	int idx[N_dim] = {}; // This array will keep track of the index of each variable we are looping over.
-	int p = N_dim-1; // p will keep track of which variable we are looping over
-	char line[1000]; // Line to be scanned
-	char *var; // Each variable to be read
-	while(idx[0] < N_dat[0]){
-	  fgets(line, sizeof line, fp);
-	  if (line[0] == '#') continue; // Ignore lines starting with #
-	  var = strtok(line, " "); // Read first element in line
-	
-	  for(int i=0; i<N_dim; ++i){
-	    sscanf(var, "%lf", &x[i][idx[i]]);
-	    var = strtok(NULL, " "); // Read next element in line
-	  }
+      if (isNpy) {
+        read_npy_file<N_dim>(filepath, f, N_dat);
+      } else if (!isBinary) {
+        /* Text file */
+        if(access(filepath, F_OK) != 0){
+          std::cerr<<"Error at interp: the input file "<<filepath<<" does not exist"<<std::endl;
+          exit(1);
+        }
+        
+        FILE *fp = fopen(filepath, "r");
+        int idx[N_dim] = {}; // This array will keep track of the index of each variable we are looping over.
+        int p = N_dim-1; // p will keep track of which variable we are looping over
+        char line[1000]; // Line to be scanned
+        char *var; // Each variable to be read
+        while(idx[0] < N_dat[0]){
+          fgets(line, sizeof line, fp);
+          if (line[0] == '#') continue; // Ignore lines starting with #
+          var = strtok(line, " "); // Read first element in line
+        
+          for(int i=0; i<N_dim; ++i){
+            sscanf(var, "%lf", &x[i][idx[i]]);
+            var = strtok(NULL, " "); // Read next element in line
+          }
 
-	  // Scan f
-	  int idx_f = 0; // idx_f = idx[N_dim-1]
-	  //       + idx[N_dim-2]*N_dat[N_dim-1]
-	  //       + idx[N_dim-3]*N_dat[N_dim-1]*N_dat[N_dim-2]
-	  //       + ...
-	  for(int i=N_dim-1; i>=0; --i){
-	    int tmp = idx[i];
-	    for (int j=i+1; j<=N_dim-1; ++j)
-	      tmp *= N_dat[j];
-	    idx_f += tmp;
-	  }
-	  sscanf(var, "%lf", &f[idx_f]);
-	  var = strtok(NULL, " "); // Read next element in line
+          // Scan f
+          int idx_f = 0; // idx_f = idx[N_dim-1]
+          //       + idx[N_dim-2]*N_dat[N_dim-1]
+          //       + idx[N_dim-3]*N_dat[N_dim-1]*N_dat[N_dim-2]
+          //       + ...
+          for(int i=N_dim-1; i>=0; --i){
+            int tmp = idx[i];
+            for (int j=i+1; j<=N_dim-1; ++j)
+              tmp *= N_dat[j];
+            idx_f += tmp;
+          }
+          sscanf(var, "%lf", &f[idx_f]);
+          var = strtok(NULL, " "); // Read next element in line
 
-	  // Advance the loop               
+          // Advance the loop               
           ++idx[p];
           while(idx[p]==N_dat[p]){ // Iteration over p is over. Look for the next index that has to be iterated over
             if(p==0)
@@ -244,38 +290,38 @@ namespace interp{
           if(idx[0] == N_dat[0])
             break;
           p = N_dim-1;
-	}
-	fclose(fp);
+        }
+        fclose(fp);
       } else{
-	/* Binary file */
-	if(access(filepath, F_OK) != 0){
-	  std::cerr<<"Error at interp: the input file "<<filepath<<" does not exist"<<std::endl;
-	  exit(1);
-	}
-	FILE *fp = fopen(filepath, "rb");
-	int idx[N_dim] = {}; // This array will keep track of the index of each variable we are looping over.
-	int p = N_dim-1; // p will keep track of which variable we are looping over
-	float var[N_dim+1]; //Variables to be read
-	while(idx[0] < N_dat[0]){
-	  fread(&var, sizeof(float), N_dim+1, fp);
+        /* Binary file */
+        if(access(filepath, F_OK) != 0){
+          std::cerr<<"Error at interp: the input file "<<filepath<<" does not exist"<<std::endl;
+          exit(1);
+        }
+        FILE *fp = fopen(filepath, "rb");
+        int idx[N_dim] = {}; // This array will keep track of the index of each variable we are looping over.
+        int p = N_dim-1; // p will keep track of which variable we are looping over
+        float var[N_dim+1]; //Variables to be read
+        while(idx[0] < N_dat[0]){
+          fread(&var, sizeof(float), N_dim+1, fp);
 
-	  for(int i=0; i<N_dim; ++i)
-	    x[i][idx[i]] = (double) var[i];
-	  
-	  // Scan f
-	  int idx_f = 0; // idx_f = idx[N_dim-1]
-	  //       + idx[N_dim-2]*N_dat[N_dim-1]
-	  //       + idx[N_dim-3]*N_dat[N_dim-1]*N_dat[N_dim-2]
-	  //       + ...
-	  for(int i=N_dim-1; i>=0; --i){
-	    int tmp = idx[i];
-	    for (int j=i+1; j<=N_dim-1; ++j)
-	      tmp *= N_dat[j];
-	    idx_f += tmp;
-	  }
-	  f[idx_f] = (double) var[N_dim];
+          for(int i=0; i<N_dim; ++i)
+            x[i][idx[i]] = (double) var[i];
+          
+          // Scan f
+          int idx_f = 0; // idx_f = idx[N_dim-1]
+          //       + idx[N_dim-2]*N_dat[N_dim-1]
+          //       + idx[N_dim-3]*N_dat[N_dim-1]*N_dat[N_dim-2]
+          //       + ...
+          for(int i=N_dim-1; i>=0; --i){
+            int tmp = idx[i];
+            for (int j=i+1; j<=N_dim-1; ++j)
+              tmp *= N_dat[j];
+            idx_f += tmp;
+          }
+          f[idx_f] = (double) var[N_dim];
 
-	  // Advance the loop               
+          // Advance the loop               
           ++idx[p];
           while(idx[p]==N_dat[p]){ // Iteration over p is over. Look for the next index that has to be iterated over
             if(p==0)
@@ -287,8 +333,8 @@ namespace interp{
           if(idx[0] == N_dat[0])
             break;
           p = N_dim-1;
-	}
-	fclose(fp);
+        }
+        fclose(fp);
       }
       
       /* Reparametrizations for logarithmic interpolation */

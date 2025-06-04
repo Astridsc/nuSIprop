@@ -650,7 +650,7 @@ private:
     else
       return norm_total * get_SFR(z) * pow(E0/(1+z), si) * (pow(Ep, 2-si) - pow(Em, 2-si)) / (2-si);
   }
-
+  /*Astrid: Varför skriver dom si-2? Används si=2 som någon typ av default värde?*/
   /* Quantities related to the interaction */
 
   double scalar_width(){
