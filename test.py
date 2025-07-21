@@ -4,7 +4,7 @@ import numpy as np
 
 # Construct the object. Only the parameters mphi, g, mntot and si are mandatory
 evolver = nuSIprop.pyprop(mphi = 5*1e6, # Mediator mass [eV]
-			  g = 0.1, # Coupling
+			  g = 0.01, # Coupling
 			  mntot = 0.1, # Sum of neutrino masses [eV]
 			  si = 2.0, # Spectral index
 			  norm = 1, # Normalization of the free-streaming flux at 100 TeV [Default = 1]
@@ -13,7 +13,7 @@ evolver = nuSIprop.pyprop(mphi = 5*1e6, # Mediator mass [eV]
 			  normal_ordering = True, # Normal neutrino mass ordering? [Default = True]
 			  N_bins_E = 300, # Number of energy bins, uniformly distributed in log space [Default = 300]
 			  lEmin = 13, # log_10 (E_min/eV) [Default = 13]
-			  lEmax = 16, # log_10 (E_max/eV) [Default = 17]
+			  lEmax = 17, # log_10 (E_max/eV) [Default = 17]
 			  zmax = 5, # Largest redshift at which sources are included [Default = 5]
 			  flav = 2, # Flavor of interacting neutrinos [0=e, 1=mu, 2=tau. Default = 2]
 			  phiphi = True # Consider double-scalar production? If set to true, the files xsec/alpha_phiphi.bin and xsec/alphatilde_phiphi.bin must exist [Default = False]
@@ -34,7 +34,7 @@ for (energy, flx_e, flx_mu, flx_ta) in zip(evolver.get_energies(),
 
 # Save the result to a csv file
 flx_df = pd.DataFrame(flx.T, index=evolver.get_energies(), columns=['nu_e', 'nu_mu', 'nu_tau'])
-flx_df.to_csv('flux_Fig6.csv')
+flx_df.to_csv('flux_Fig3a.csv')
 
 print(flx_df)
 

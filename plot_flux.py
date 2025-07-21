@@ -32,11 +32,11 @@ def plot_fig2(df):
 def plot_fig3a(df):
     n = int(len(df.index)/2)
     norm = 1e28
-    plt.plot(df.index[:n]/1e9, df['nu_e'].iloc[:n], label=r'$\nu_e$')
+    #plt.plot(df.index[:n]/1e9, df['nu_e'].iloc[:n], label=r'$\nu_e$')
 
-    """plt.plot(df.index[:n]/1e9, df['nu_e'].iloc[:n]*df.index[:n]**2/norm, label=r'$\nu_e$')
-    plt.plot(df.index[:n]/1e9, df['nu_mu'].iloc[:n]*df.index[:n]**2/norm, label=r'$\nu_\mu$')
-    plt.plot(df.index[:n]/1e9, df['nu_tau'].iloc[:n]*df.index[:n]**2/norm, label=r'$\nu_\tau$')"""
+    plt.plot(df.index/1e9, df['nu_e']*df.index**2/norm, label=r'$\nu_e$')
+    plt.plot(df.index/1e9, df['nu_mu']*df.index**2/norm, label=r'$\nu_\mu$')
+    plt.plot(df.index/1e9, df['nu_tau']*df.index**2/norm, label=r'$\nu_\tau$')
 
     #plt.plot(df.index[:n]/1e9, df.index[:n]*df['nu_e'].iloc[:n]/np.log10(df.index[:n])/2.3/norm, label=r'$\nu_e$')
     #plt.plot(df.index[:n]/1e9, df.index[:n]*df['nu_mu'].iloc[:n]/np.log10(df.index[:n])/2.3/norm, label=r'$\nu_\mu$')
@@ -49,8 +49,7 @@ def plot_fig3a(df):
     plt.legend()
     plt.show()
 
-#df = pd.read_csv('flux_results.csv', index_col=0)
-#plot_fig3a(df)
+
 
 def plot_fig3b(df_majorana, df_dirac):
     n = int(len(df_majorana.index)/2)
@@ -71,8 +70,8 @@ def plot_fig3b(df_majorana, df_dirac):
     plt.legend()
     plt.show()
 
-df_majorana = pd.read_csv('flux/flux_majorana_z_2_5.csv', index_col=0)
-df_dirac = pd.read_csv('flux/flux_dirac_z_2_5.csv', index_col=0)
+#df_majorana = pd.read_csv('flux/flux_majorana_z_2_5.csv', index_col=0)
+#df_dirac = pd.read_csv('flux/flux_dirac_z_2_5.csv', index_col=0)
 #plot_fig3b(df_majorana, df_dirac)
 
 
@@ -218,6 +217,9 @@ def plot_phiphi_diff(df_phiphi, df_no_phiphi):
 
 
 if __name__ == "__main__":
-    plot_fig3b(df_majorana, df_dirac)
+    
+    #plot_fig3b(df_majorana, df_dirac)
+    df = pd.read_csv('flux/flux_Fig3a.csv', index_col=0)
+    plot_fig3a(df)
 
 

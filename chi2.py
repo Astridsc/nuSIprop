@@ -20,8 +20,6 @@ import binning
 
 #sys.path.append('/home/astridaurora/HESE-7-year-data-release/HESE-7-year-data-release/Astrid')
 from Astrid import effective_area
-from Astrid import data_processing
-from Astrid.data_processing import get_weights
 
 
 class SuppressOutput:
@@ -48,72 +46,7 @@ class SuppressOutput:
         os.close(self._original_stdout_fd)
         os.close(self._original_stderr_fd)
 
-"""
-def total_events(flx, eff, livetime, norm, delta_E, save_to_csv=False):
-    # Interpolate `flx` to the same energy bins as `eff`
-    #print('flx: ', flx)
-    flx_interpolated = pd.DataFrame(
-    {col: interp1d(flx.index, flx[col], bounds_error=False, fill_value="extrapolate")(eff.index)
-     for col in flx.columns},
-    index=eff.index)
-    #print('flx interpolated: ', flx_interpolated)
 
-    total_events_df = flx_interpolated * eff * livetime * norm
-    total_events_df['total_events'] = delta_E * (total_events_df['nu_e'] + total_events_df['nu_mu'] + total_events_df['nu_tau'])
-    total_events_df.index = eff.index
-
-    if save_to_csv==True:
-        total_events_df.to_csv('total_events.csv')
-
-    return total_events_df
-
-
-def apply_energy_smearing(energies, events, resolution):
-
-    smeared_events = np.zeros_like(events)  # Initialize array for smeared events
-    
-    for i, E_true in enumerate(energies):
-        # Gaussian width depends on resolution and energy
-        logE = np.log10(energies)
-        logE_true = np.log10(E_true)
-        sigma_log = resolution  # Now resolution is fractional in log10(E)
-        gaussian = np.exp(-0.5 * ((logE - logE_true) / sigma_log) ** 2)
-        #sigma = resolution * E_true  
-        #gaussian = np.exp(-0.5 * ((energies - E_true) / sigma) ** 2)
-
-        gaussian_sum = np.sum(gaussian)
-        gaussian /= gaussian_sum  # Normalize Gaussian for proper redistribution
-
-        # Redistribute current bin's events according to the Gaussian
-        smeared_events += events[i] * gaussian
-        if i == 0 or i == len(energies)-1:
-            print(f"Edge bin {i}: gaussian sum = {gaussian_sum}")
-    
-    return smeared_events
-
-
-def rebinning(total_events, Edep):
-    # Same procedure as used by HESE
-    emin, emax = Edep[0], Edep[-1]
-    nbins = len(Edep)
-    width = (np.log10(emax) - np.log10(emin)) / nbins
-    e_edges, _, _ = binning.get_bins(emin, emax, ewidth=width, eedge=emin)
-    bin_centers = 10.0 ** (0.5 * (np.log10(e_edges[:-1]) + np.log10(e_edges[1:]))) # Oklart varför dom börjar med index 1 istället för 0
-
-    # Group data into logarithmic bins
-    total_events_binned = total_events.groupby(pd.cut(total_events.index, e_edges, include_lowest=True)).sum()
-    #total_events_binned = pd.cut(total_events['total'], e_edges, include_lowest=True)
-    #print('total_events_binned: ', total_events_binned)
-
-    # Compute the midpoint (center) of each logarithmic interval
-    # Geometric mean for log step midpoints
-    total_events_binned['interval_center'] = [
-        (interval.left * interval.right) ** 0.5 for interval in total_events_binned.index
-    ]
-    #total_events_binned['interval_center'] = bin_centers
-
-    return total_events_binned
-"""
 
 def compute_chi2(df1, df2):
     """
@@ -139,27 +72,35 @@ def compute_chi2(df1, df2):
     dof = len(df1) - 1
 
     # Flatten DataFrames to compare all rows/columns
-    observed = df2.values.flatten()
-    expected = df1.values.flatten()
+    #observed = df1.values.flatten()
+    #expected = df2.values.flatten()
+    observed = df1
+    expected = df2
+
     # Avoid division by zero
-    expected = np.where(expected == 0, 1e-6, expected)
+    observed = np.where(observed == 0, 1e-6, observed)
 
     # Avoid division by zero in chi2 calculation
-    if np.any(expected == 0):
+    if np.any(observed == 0):
         raise ValueError("Expected values must not contain zeros")
 
     # Compute chi-squared statistic
-    chi2_value = np.sum((observed - expected) ** 2 / expected)
+    chi2_value = np.sum((observed - expected) ** 2 / observed)
 
     # Calculate p-value
     p_value = chi2.sf(chi2_value, dof)
     
     return chi2_value, p_value
 
+Edep1 = np.logspace(4, 5, num=20+1)
+Edep2 = np.logspace(5, 7, num=40+1)
+
+livetime15 = 15*365*24*3600
+livetime10 = 10*365*24*3600
 
 
-mc1 = pd.read_csv('~/nuSIprop/HESE_MC_events/mc_Gen1.csv', index_col=0)
-mc2 = pd.read_csv('~/nuSIprop/HESE_MC_events/mc_Gen2.csv', index_col=0)
+mc1 = pd.read_csv('~/nuSIprop/HESE_MC_events/mc_Gen1_smeared_si25_norm5.csv', index_col=0)
+mc2 = pd.read_csv('~/nuSIprop/HESE_MC_events/mc_Gen2_smeared_si25_norm5.csv', index_col=0)
 
 # Oklar normalisering?.....
 #mc1['total_events'] *= 
@@ -168,52 +109,27 @@ mc2 = pd.read_csv('~/nuSIprop/HESE_MC_events/mc_Gen2.csv', index_col=0)
 print('mc1: ', mc1)
 print('mc2: ', mc2)
 
-eff1 = pd.read_csv('effective_areas/effective_areas_by_flavor_gen1.csv', index_col=0)
-eff2 = pd.read_csv('effective_areas/effective_areas_by_flavor_gen2.csv', index_col=0)
+data = pd.read_csv('HESE_data.csv', index_col=0)
+print('data: ', data)
+
+#eff1 = pd.read_csv('effective_areas/effective_areas_by_flavor_gen1.csv', index_col=0)
+#eff2 = pd.read_csv('effective_areas/effective_areas_by_flavor_gen2.csv', index_col=0)
+eff1 = pd.read_csv('effective_areas/eff_Gen1.csv', index_col=0)
+eff2 = pd.read_csv('effective_areas/eff_Gen2.csv', index_col=0)
 energies1 = np.asarray(eff1.index)
 energies2 = np.asarray(eff2.index)
+bin_centers1 = effective_area.bin_edges_to_centers(energies1)
+bin_centers2 = effective_area.bin_edges_to_centers(energies2)
+print('bin_centers1: ', bin_centers1)
+print('bin_centers2: ', bin_centers2)
 
-Edep1 = np.logspace(4, 5, num=20+1)
-Edep2 = np.logspace(5, 7, num=40+1)
-
-# Get the effective area as originally provided by HESE (1e4 to 1e7), [m2]
-# Compute limited/extrapolated effective area and energy bins 
-"""eff1 = effective_area.get_effective_area_dataframe(Edep1, gen2=False)
-eff2 = effective_area.get_effective_area_dataframe(Edep2, gen2=True)
-#eff1.to_csv('effective_areas_by_flavor_gen1.csv')
-#eff2.to_csv('effective_areas_by_flavor_gen2.csv')
-energies1 = np.asarray(eff1.index)
-energies2 = np.asarray(eff2.index)
-
-mc1, weights1 = get_weights(Edep1, livetime=LIVETIME3, gen2=False)
-mc2, weights2 = get_weights(Edep2, livetime=LIVETIME2, gen2=True)
-mc_df1 = pd.DataFrame({
-        'Edep': mc1['recoDepositedEnergy'],
-        'weights': np.asarray(weights1[0]),
-    })
-mc_df2 = pd.DataFrame({
-        'Edep': mc2['recoDepositedEnergy'],
-        'weights': np.asarray(weights2[0]),
-    })
-
-mc_df1 = rebinning(mc_df1, Edep_new)
-mc_df2 = rebinning(mc_df2, Edep_new)
-mc_df1.set_index(Edep1[1:], inplace=True)
-mc_df2.set_index(Edep2[1:], inplace=True)
-"""
-
-livetime15 = 15*365*24*3600
-livetime10 = 10*365*24*3600
-
-n_iter = 7
+n_iter = 5
 si_grid = np.linspace(2.0, 3.0, n_iter)  
 si_marginalized_1 = []
 si_marginalized_2 = []
 
 g_phi = np.logspace(-4, 0, num=n_iter)
-M_min = 4*1e-1
-M_max = 2*1e2
-M_phi = np.logspace(np.log10(M_min), np.log10(M_max), num=n_iter)
+M_phi = np.logspace(np.log10(4*1e-1), np.log10(2*1e2), num=n_iter)
 
 evolver1 = nuSIprop.pyprop(mphi = M_phi[0]*1e6, # Mediator mass [eV]
 			  g = g_phi[0], # Coupling
@@ -239,9 +155,9 @@ evolver2 = nuSIprop.pyprop(mphi = M_phi[0]*1e6, # Mediator mass [eV]
 			  majorana = True, # Majorana neutrinos? [Default = True]
 			  non_resonant = True, # Include non s-channel contributions? Relevant for couplings g>~0.1 [Default = True]
 			  normal_ordering = True, # Normal neutrino mass ordering? [Default = True]
-			  N_bins_E = 300, # Number of energy bins, uniformly distributed in log space [Default = 300]
+			  N_bins_E = 600, # Number of energy bins, uniformly distributed in log space [Default = 300]
 			  lEmin = 14, # log_10 (E_min/eV) [Default = 13]
-			  lEmax = 17, # log_10 (E_max/eV) [Default = 17]
+			  lEmax = 16, # log_10 (E_max/eV) [Default = 17]
 			  zmax = 5, # Largest redshift at which sources are included [Default = 5]
 			  flav = 2, # Flavor of interacting neutrinos [0=e, 1=mu, 2=tau. Default = 2]
 			  phiphi = False # Consider double-scalar production? If set to true, the files xsec/alpha_phiphi.bin and xsec/alphatilde_phiphi.bin must exist [Default = False]
@@ -269,37 +185,44 @@ def compute_for_params(g_, M_):
         flx2 = evolver2.get_flux_fla()         
         flx1_df = pd.DataFrame(flx1.T, index=evolver1.get_energies(), columns=['nu_e', 'nu_mu', 'nu_tau'])
         flx2_df = pd.DataFrame(flx2.T, index=evolver2.get_energies(), columns=['nu_e', 'nu_mu', 'nu_tau'])
-        delta_E_1 = np.diff(flx1_df.index.values)
-        delta_E_2 = np.diff(flx2_df.index.values)
-        delta_E_1 = np.append(delta_E_1, delta_E_1[-1])  # Append last value to match length
-        delta_E_2 = np.append(delta_E_2, delta_E_2[-1])  # Append last value to match length
+        
+        bin_centers1 = flx1_df.index.values
+        bin_centers2 = flx2_df.index.values
+        #print('bin_centers1: ', bin_centers1)
+        #print('bin_centers2: ', bin_centers2)
+        bin_edges1 = effective_area.bin_centers_to_edges(bin_centers1)        
+        bin_edges2 = effective_area.bin_centers_to_edges(bin_centers2)
+        delta_E1 = np.diff(bin_edges1)
+        delta_E2 = np.diff(bin_edges2)
+        
         flx1_df.index = flx1_df.index / 1e9    # Convert to [GeV]
         flx2_df.index = flx2_df.index / 1e9  
 
-        #norm = 5*1e-18  # Normalization of the free-streaming flux at 100 TeV
-        total_events1 = effective_area.total_events(eff=flx1_df, flx=eff1, livetime=livetime15, norm=1, delta_E=delta_E_1)
-        total_events2 = effective_area.total_events(eff=flx2_df, flx=eff2, livetime=livetime10, norm=1, delta_E=delta_E_2)
+        #norm = 1e-4 to account for cm to m conversion
+        total_events1 = effective_area.total_events(eff=flx1_df, flx=eff1, livetime=livetime15, norm=1e-4, delta_E=delta_E1)
+        total_events2 = effective_area.total_events(eff=flx2_df, flx=eff2, livetime=livetime10, norm=1e-4, delta_E=delta_E2)
 
         # Apply energy smearing 
-        smeared_events1 = effective_area.apply_energy_smearing(energies=np.asarray(total_events1.index), 
+        total_events1['with_resolution'] = effective_area.apply_energy_smearing(energies=np.asarray(total_events1.index), 
                                                 events=np.asarray(total_events1['total_events']), 
                                                 resolution=0.1)
-        smeared_events2 = effective_area.apply_energy_smearing(energies=np.asarray(total_events2.index), 
+        total_events2['with_resolution'] = effective_area.apply_energy_smearing(energies=np.asarray(total_events2.index), 
                                                 events=np.asarray(total_events2['total_events']), 
                                                 resolution=0.1)
-        total_events1['with_resolution'] = smeared_events1        
-        total_events2['with_resolution'] = smeared_events2
+ 
 
-        total_events1 = effective_area.rebinning(total_events1, Edep1)
-        total_events2 = effective_area.rebinning(total_events2, Edep2)
+        #total_events1 = effective_area.rebinning(total_events1, Edep1)
+        #total_events2 = effective_area.rebinning(total_events2, Edep2)
+        counts1, edges1 = np.histogram(total_events1['with_resolution'], Edep1)
+        counts2, edges2 = np.histogram(total_events2['with_resolution'], Edep2)
 
         print('total_events 1 binned: ', total_events1)
         print('total_events 2 binned: ', total_events2)
         print(len(total_events1), len(total_events2))
 
         # Compute chi2 values
-        chi2_1_, p_val_1 = compute_chi2(mc1['weights'], total_events1['with_resolution'])
-        chi2_2_, p_val_2 = compute_chi2(mc2['weights'], total_events2['with_resolution'])
+        chi2_1_, p_val_1 = compute_chi2(mc1['events'], counts1)
+        chi2_2_, p_val_2 = compute_chi2(mc2['events'], counts2)
         chi2_1_si.append(chi2_1_)
         chi2_2_si.append(chi2_2_)
 
@@ -340,6 +263,10 @@ chi2_combined_df = pd.DataFrame(
 )
 print('chi2 combined: ', chi2_combined_df)
 
+# Save chi2 values to csv
+chi2_combined_df.to_csv('chi2_combined.csv')
+
+
 # Compute the critical chi2 value for 2 sigma exclusion. Degrees of freedom for each generation
 chi2_critical_1 = chi2.ppf(0.95, df=20-1)
 chi2_critical_2 = chi2.ppf(0.95, df=40-1)
@@ -373,3 +300,4 @@ plt.legend()
 plt.grid(True, which='both', ls='--')
 plt.tight_layout()
 plt.show()
+
