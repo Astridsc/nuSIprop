@@ -4,10 +4,10 @@ import numpy as np
 
 # Construct the object. Only the parameters mphi, g, mntot and si are mandatory
 evolver = nuSIprop.pyprop(mphi = 5*1e6, # Mediator mass [eV]
-			  g = 0.01, # Coupling
+			  g = 1e-30, # Coupling
 			  mntot = 0.1, # Sum of neutrino masses [eV]
 			  si = 2.0, # Spectral index
-			  norm = 1, # Normalization of the free-streaming flux at 100 TeV [Default = 1]
+			  norm = 1e-18, # Normalization of the free-streaming flux at 100 TeV [Default = 1]
 			  majorana = True, # Majorana neutrinos? [Default = True]
 			  non_resonant = True, # Include non s-channel contributions? Relevant for couplings g>~0.1 [Default = True]
 			  normal_ordering = True, # Normal neutrino mass ordering? [Default = True]
@@ -16,7 +16,7 @@ evolver = nuSIprop.pyprop(mphi = 5*1e6, # Mediator mass [eV]
 			  lEmax = 17, # log_10 (E_max/eV) [Default = 17]
 			  zmax = 5, # Largest redshift at which sources are included [Default = 5]
 			  flav = 2, # Flavor of interacting neutrinos [0=e, 1=mu, 2=tau. Default = 2]
-			  phiphi = True # Consider double-scalar production? If set to true, the files xsec/alpha_phiphi.bin and xsec/alphatilde_phiphi.bin must exist [Default = False]
+			  phiphi = False # Consider double-scalar production? If set to true, the files xsec/alpha_phiphi.bin and xsec/alphatilde_phiphi.bin must exist [Default = False]
                           )
 
 # Evolve it
