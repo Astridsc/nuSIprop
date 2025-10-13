@@ -4,10 +4,17 @@
   gcc -shared -o funcs.so -fPIC funcs.c
   */
 
+
 #include <math.h>
 #include <stdio.h>
 #define SQR(x) ((x)*(x))
 #define CUB(x) ((x)*(x)*(x))
+
+/* Tillägg på inrådan av chat gpt för att hantera kompabilitet*/
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 double primitive(double tau, double s){
   /**
@@ -18,7 +25,9 @@ double primitive(double tau, double s){
     /(64.*M_PI*SQR(s));
 }
 
-double dsigma_phiphi_over_tauphi(int n, double args[n]){
+/*double dsigma_phiphi_over_tauphi(int n, double args[n]){ */
+/* Ändring av args från args[n] till args pga kompatabilitet med kluster standards /Astrid   */
+double dsigma_phiphi_over_tauphi(int n, double *args){
   double tbar = args[1];
   double sbar = args[0];
 
@@ -37,3 +46,8 @@ double dsigma_phiphi_over_tauphi(int n, double args[n]){
   
   return primitive(upperLim, sbar) - primitive(lowerLim, sbar);
 }
+
+
+#ifdef __cplusplus
+}
+#endif
