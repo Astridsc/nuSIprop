@@ -173,7 +173,7 @@ def _apply_energy_smearing_serial(energies, events, resolution):
 
 
 
-def prior_transform(cube):
+def prior_transform_nuSIprop(cube):
     """Vectorized prior transform: maps [0,1]^3 -> (Mphi, g, si)"""
     # Handle both single cube and multiple cubes
     """if cube.ndim == 1:
@@ -186,7 +186,7 @@ def prior_transform(cube):
 
 
     # Mphi log-uniform in [0.1, 1000]
-    Mphi_min, Mphi_max = 0.1, 1000
+    Mphi_min, Mphi_max = 0.03, 100
     #Mphi = 10**(Mphi_min + (Mphi_max - Mphi_min) * u_Mphi)
     Mphi = Mphi_min * (Mphi_max / Mphi_min) ** u_Mphi
 
@@ -196,14 +196,14 @@ def prior_transform(cube):
     g = g_min * (g_max / g_min) ** u_g
     
     # mntot uniform in [0.06, 0.12]
-    mntot_min, mntot_max = 0.06, 0.12
-    mntot = mntot_min + (mntot_max - mntot_min) * u_mntot
+    #mntot_min, mntot_max = 0.06, 0.12
+    #mntot = mntot_min + (mntot_max - mntot_min) * u_mntot
 
     # si uniform in [2.0, 3.0]
     si = 2.0 + (4.0 - 2.0) * u_si
 
     # Return with the same shape as input
-    return Mphi, g, mntot, si
+    return Mphi, g, si
 
 
 
@@ -327,12 +327,12 @@ def create_manual_trace_plot(sampler, result):
 
 
 def log_likelihood(theta):
-    Mphi, g, mntot, si = theta
+    Mphi, g, si = theta
 
 
     # update rank-local evolver
     #evolver.set_parameters(mphi=Mphi*1e6, g=g, si=si)
-    evolver.set_parameters(mphi=Mphi*1e6, g=g, mntot=mntot, si=si)
+    evolver.set_parameters(mphi=Mphi*1e6, g=g, si=si)
     evolver.evolve()
     flux = evolver.get_flux_fla()
 
@@ -363,9 +363,40 @@ def log_likelihood(theta):
     return log_likelihood_poisson(data=data, predicted=predicted)
 
 
+def run_ultranest(param_names=['Mphi', 'g', 'si'], loglike=log_likelihood, prior_transform=prior_transform_nuSIprop, log_dir='ultranest_results/hese/nuSIprop/Majorana_NO/mntot_0065', resume='subfolder'):
+    # Valid for all flux models
+    sampler = ultranest.ReactiveNestedSampler(
+        param_names,
+        loglike,
+        prior_transform,
+        log_dir=log_dir,
+        resume=resume
+    )
+
+    print('Running sampler...')
+    result = sampler.run(dlogz=0.2, dKL=0.2)
+    #result = sampler.run()
+    if MPI_AVAILABLE and MPI.COMM_WORLD.rank == 0:
+        print('Result: ', result)
+        sampler.print_results()
+        
+        sampler.plot_run()
+        sampler.plot_trace()
+        sampler.plot_corner()
+        
+    elif not MPI_AVAILABLE:
+        sampler.print_results()
+        print('not MPI_AVAILABLE')
+    return result
+
+
 # --- Run UltraNest ---
 if __name__ == "__main__":
-    sampler = ultranest.ReactiveNestedSampler(
+    
+    run_ultranest(param_names=['Mphi', 'g', 'si'], loglike=log_likelihood, prior_transform=prior_transform_nuSIprop, log_dir='ultranest_results/hese/nuSIprop/Majorana_NO/mntot_0065', resume='subfolder')
+
+    
+    """sampler = ultranest.ReactiveNestedSampler(
         ["Mphi", "g", "mntot", "si"],
         log_likelihood,
         prior_transform,
@@ -430,7 +461,7 @@ if __name__ == "__main__":
 
     elif not MPI_AVAILABLE:
         sampler.print_results()
-        print('not MPI_AVAILABLE')
+        print('not MPI_AVAILABLE')"""
 
 
 

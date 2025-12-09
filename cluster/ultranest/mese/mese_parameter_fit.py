@@ -123,7 +123,7 @@ sigma2 = (sigma_upper - sigma_lower) / (sigma_upper + sigma_lower)       # Encod
 
 
 
-def initialize_evolver(M_phi=0.25, g_phi=1e-35, mntot=0.15, si=2.5, norm_=1):
+def initialize_evolver(M_phi=0.25, g_phi=1e-35, mntot=0.1, si=2.5, norm_=1):
     # Initialize flux evolver object with arbitrary parameters and return energies, bin edges, and delta E
     # Only called once, as these are the same for all parameters
 
@@ -132,7 +132,7 @@ def initialize_evolver(M_phi=0.25, g_phi=1e-35, mntot=0.15, si=2.5, norm_=1):
                 mntot = mntot, # Sum of neutrino masses [eV]
                 si = si, # Spectral index
                 norm = norm_*1e-18, # Normalization of the free-streaming flux at 100 TeV [Default = 1]
-                majorana = True, # Majorana neutrinos? [Default = True]
+                majorana = False, # Majorana neutrinos? [Default = True]
                 non_resonant = True, # Include non s-channel contributions? Relevant for couplings g>~0.1 [Default = True]
                 normal_ordering = True, # Normal neutrino mass ordering? [Default = True]
                 N_bins_E = 300, # Number of energy bins, uniformly distributed in log space [Default = 300]
@@ -180,8 +180,8 @@ def integrate_nuSIprop_E2phi(theta, interaction=True):
     #Mphi, g, si = theta
     #Mphi, g, mntot, si, norm = theta
     if interaction:
-        Mphi, g, si, norm = theta
-        evolver.set_parameters(mphi=Mphi*1e6, g=g, si=si, norm=norm*1e-18)
+        Mphi, g, si, norm, mntot = theta
+        evolver.set_parameters(mphi=Mphi*1e6, g=g, si=si, norm=norm*1e-18, mntot=mntot)
     else:
         si, norm = theta
         evolver.set_parameters(si=si, norm=norm*1e-18)
@@ -206,6 +206,7 @@ def integrate_nuSIprop_E2phi(theta, interaction=True):
 
         # integrate E^2 * phi(E) over the bin using trapezoid rule
         integrand = (Es**2) * phis
+        #print('integrand: ', integrand)
         integral = np.trapezoid(integrand, Es)   # approximates ∫ E^2 phi dE
         preds.append(integral / (Emax - Emin))   # bin-averaged E^2 phi
 
@@ -282,7 +283,7 @@ def LP_flux(norm=2.58, alpha=2.669, beta=0.359, energies=energy_centers_MESE):
 def prior_transform_nuSIprop(cube):
     # --- Prior transform: maps [0,1]^3 -> (Mphi, g, si) ---
     #u_Mphi, u_g, u_mntot, u_si, u_norm = cube
-    u_Mphi, u_g, u_si, u_norm = cube
+    u_Mphi, u_g, u_si, u_norm, u_mntot = cube
 
     # Mphi log-uniform in [0.1, 1000]
     Mphi_min, Mphi_max = 0.03, 100   # OBS: Vid duble scalar production verkar det som att allt flux blir NAN för Mphi <~ 0.05
@@ -290,13 +291,13 @@ def prior_transform_nuSIprop(cube):
     Mphi = Mphi_min * (Mphi_max / Mphi_min) ** u_Mphi
 
     # g log-uniform in [1e-4, 1]
-    g_min, g_max = 1e-5, 1.0
+    g_min, g_max = 1e-4, 1.0
     #g = 10**(g_min + (g_max - g_min) * u_g)
     g = g_min * (g_max / g_min) ** u_g
 
     # mntot uniform in [0.06, 0.12]
-    #mntot_min, mntot_max = 0.06, 0.16
-    #mntot = mntot_min + (mntot_max - mntot_min) * u_mntot
+    mntot_min, mntot_max = 0.059, 0.15
+    mntot = mntot_min + (mntot_max - mntot_min) * u_mntot
 
     # si uniform in [2.0, 3.0]
     si = 2.0 + (3.5 - 2.0) * u_si
@@ -304,9 +305,9 @@ def prior_transform_nuSIprop(cube):
     # norm log-uniform in [1e-19, 1e-16]
     #norm_min, norm_max = 1e-19, 5*1e-17
     #norm = norm_min * (norm_max / norm_min) ** u_norm
-    norm = 1 + (30.0 - 1) * u_norm
+    norm = 1 + (20.0 - 1) * u_norm
 
-    return Mphi, g, si, norm
+    return Mphi, g, si, norm, mntot
 
 
 def prior_transform_SPL(cube):
@@ -326,17 +327,17 @@ def prior_transform_BPL(cube):
     # --- Prior transform: maps [0,1]^4 -> (norm, si1, si2, E_break) ---
     u_norm, u_si1, u_si2, u_E_break = cube
     
-    norm_min, norm_max = 0.1, 10
+    norm_min, norm_max = 1.1, 3.2
     norm = norm_min + (norm_max - norm_min) * u_norm
     
-    si1_min, si1_max = 1.0, 2.5
+    si1_min, si1_max = 0.0, 3.0
     si1 = si1_min + (si1_max - si1_min) * u_si1
     
-    si2_min, si2_max = 2.0, 3.5
+    si2_min, si2_max = 2.4, 3.3
     si2 = si2_min + (si2_max - si2_min) * u_si2
     
-    E_break_min, E_break_max = 1e2, 1e5
-    E_break = E_break_min*(E_break_max /E_break_min) ** u_E_break
+    E_break_min, E_break_max = 4, 4.9
+    E_break = 10**(E_break_min + (E_break_max - E_break_min) * u_E_break)
     return norm, si1, si2, E_break
 
 
@@ -357,12 +358,12 @@ def prior_transform_LP(cube):
 
 
 def loglike_nuSIprop(theta):
-    #Mphi, g, mntot, si, norm = theta
-    Mphi, g, si, norm = theta
+    Mphi, g, si, norm, mntot = theta
+    #Mphi, g, si, norm = theta
     y_pred = integrate_nuSIprop_E2phi(theta, interaction=True)
     y_err = sigma1 + sigma2 * (y_pred - y_obs)
     if np.any(y_err <= 0):
-        print('Zeros in y_err for parameters: Mphi=', Mphi,', g=', g, ' si=', si,', norm=', norm)
+        print('Zeros in y_err for parameters: Mphi=', Mphi,', g=', g, ' si=', si,', norm=', norm, ' mntot=', mntot)
         print('y_err: ', y_err)
         print('y_pred: ', y_pred)
         #y_err[y_err <= 0] = 1e-11
@@ -463,8 +464,38 @@ def create_custom_corner_plot(samples, param_names=['Mphi', 'g', 'mntot', 'si', 
 evolver, energies, bin_edges_high_resolution, delta_E = initialize_evolver()
     
 
-# --- Run UltraNest ---
+def run_ultranest(param_names=['Mphi', 'g', 'si', 'norm'], loglike=loglike_nuSIprop, prior_transform=prior_transform_nuSIprop, log_dir='ultranest_results/nuSIprop/', resume=True):
+    # Valid for all flux models
+    sampler = ultranest.ReactiveNestedSampler(
+        param_names,
+        loglike,
+        prior_transform,
+        log_dir=log_dir,
+        resume=resume
+    )
+
+    print('Running sampler...')
+    result = sampler.run(dlogz=0.5, dKL=0.5)
+    #result = sampler.run()
+    if MPI_AVAILABLE and MPI.COMM_WORLD.rank == 0:
+        print('Result: ', result)
+        sampler.print_results()
+        
+        sampler.plot_run()
+        sampler.plot_trace()
+        sampler.plot_corner()
+        
+    elif not MPI_AVAILABLE:
+        sampler.print_results()
+        print('not MPI_AVAILABLE')
+    return result
+
+
+
 if __name__ == "__main__":
+    run_ultranest(param_names=['norm', 'si1', 'si2', 'E_break'], loglike=loglike, prior_transform=prior_transform_BPL, log_dir='ultranest_results/BPL', resume='subfolder')  
+    #run_ultranest(param_names=['Mphi', 'g', 'si', 'norm', 'mntot'], loglike=loglike_nuSIprop, prior_transform=prior_transform_nuSIprop, log_dir='ultranest_results/mese/nuSIprop/Dirac_NO/5params/', resume='subfolder')
+    #run_ultranest(param_names=['si', 'norm'], loglike=loglike_SPL, prior_transform=prior_transform_SPL, log_dir='ultranest_results/SPL', resume='subfolder')
    
     """
     sampler = ultranest.ReactiveNestedSampler(
@@ -492,98 +523,26 @@ if __name__ == "__main__":
         prior_transform_LP,
         log_dir='ultranest_results/LP'
     )  """
+    """
     
     sampler = ultranest.ReactiveNestedSampler(
-        ['norm', 'si1', 'si2', 'E_break'],
-        loglike,
-        prior_transform_BPL,
-        log_dir='ultranest_results/BPL',
+        ['Mphi', 'g', 'si', 'norm'],
+        loglike_nuSIprop,
+        prior_transform_nuSIprop,
+        log_dir='ultranest_results/nuSIprop/mntot_015/run1',
+        resume=True
     )
 
     print('Running sampler...')
-    result = sampler.run()
+    result = sampler.run(dlogz=0.1, dKL=0.1)
     
-
     # Print results (only from rank 0 in MPI runs)
     if MPI_AVAILABLE and MPI.COMM_WORLD.rank == 0:
         print('MPI_AVAILABLE and MPI.COMM_WORLD.rank == 0')
         
-        print('Result: ', result)
-        print('hej')
-        
-        # Print diagnostic information
-        #print(f"Number of likelihood evaluations: {result['ncall']}")
-        #print(f"Number of live points: {result['nlive']}")
-        #print(f"Evidence estimate: {result['logz']:.3f} ± {result['logzerr']:.3f}")
-        #print(f"Convergence criteria met: {result.get('converged', 'Unknown')}")
-        
         sampler.print_results()
-        
-        """sampler.plot_corner()
-        plt.savefig('corner_plot_mpi.png', dpi=300, bbox_inches='tight')
-        plt.close()"""
-
-        samples = sampler.results['samples']
-        print('samples: ', samples)
-        """
-        fig1 = corner.corner(samples, labels=['si', 'norm'],
-                           quantiles=[0.68, 0.95, 0.997],
-                           show_titles=True, title_fmt=".2f", title_kwargs={"fontsize": 12})
-
-
-        
-                           
-                # Transform selected axes to log10
-        log_samples = samples.copy()
-        log_samples[:, 0] = np.log10(samples[:, 0])   # log scale for Mphi
-        log_samples[:, 1] = np.log10(samples[:, 1])   # log scale for g
-        #log_samples[:, 3] = np.log10(samples[:, 3])   # log scale for E_break
-
-        fig1 = corner.corner(
-            log_samples,
-            labels=labels_,
-            #range=[(np.log10(0.01), np.log10(1000)),   # log range
-            #    (np.log10(1e-5), np.log10(1.0)),   # log range
-            #    (2.0, 3.5),                       # linear range
-            #    (np.log10(1e-19), np.log10(5*1e-17))],                       # linear range
-            quantiles=[0.68, 0.95, 0.997],
-            show_titles=True,
-            title_fmt=".2f",
-            title_kwargs={"fontsize": 12}
-        )
-        
-        
-        fig1 = corner.corner(samples, labels=['norm', 'alpha', 'beta'],
-                           quantiles=[0.68, 0.95, 0.997],
-                           show_titles=True, title_fmt=".2f", title_kwargs={"fontsize": 12})"""
-
-        #fig1.close()
-        sampler.plot_run()
-        sampler.plot_trace()
-        sampler.plot_corner()
-        
-        #fig1.savefig(log_dir + "/corner.png")
-        #fig2 = create_custom_corner_plot(samples, param_names=['Mphi', 'g', 'si', 'norm'], title='corner_custo_mese.png')
-
-        #fig2.close()
-        
-        
-        #run_plot = sampler.plot_run()
-        #run_plot.savefig("run_plot.png")
-        #run_plot.close()
-        
-        #trace_plot = sampler.plot_trace()
-        #trace_plot.savefig("trace_plot.png")
-        #trace_plot.close()
-        
-        #create_manual_run_plot(sampler, result)
-        #create_manual_trace_plot(sampler, result)
-        
-        print('hej2')
-        
-
 
     elif not MPI_AVAILABLE:
         sampler.print_results()
-        print('not MPI_AVAILABLE')
+        print('not MPI_AVAILABLE')"""
 

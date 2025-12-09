@@ -14,6 +14,8 @@
 #define SQR(x)  ((x)*(x))  // square of a number
 #define CUB(x)  ((x)*(x)*(x))  // cube of a number
 
+// Orginalet från Github, /Astrid
+
 namespace nuSIprop{
 
 class calculate_flux
@@ -650,7 +652,7 @@ private:
     else
       return norm_total * get_SFR(z) * pow(E0/(1+z), si) * (pow(Ep, 2-si) - pow(Em, 2-si)) / (2-si);
   }
-  /*Astrid: Varför skriver dom si-2? Används si=2 som någon typ av default värde?*/
+
   /* Quantities related to the interaction */
 
   double scalar_width(){
